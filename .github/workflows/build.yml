@@ -1,52 +1,53 @@
 
-name: Android APK
+name: Build 5G DNS Quick Switch
 
 on:
   workflow_dispatch:
   push:
     branches:
       - main
+      - master
 
 jobs:
   build:
+    name: Build APK
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout source
         uses: actions/checkout@v4
 
-      - name: Extract source ZIP if present
-        shell: bash
-        run: |
-          if [ -f "5g-dns-quick-switch-source.zip" ]; then
-            unzip -o "5g-dns-quick-switch-source.zip" -d .
-          fi
-          test -f app/build.gradle
-          test -f app/src/main/AndroidManifest.xml
-
-      - name: Set up JDK 17
+      - name: Set up Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
-
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          accept-android-sdk-licenses: true
 
-      - name: Accept SDK licenses
-        shell: bash
+      - name: Accept Android SDK licenses
+        run: yes | sdkmanager --licenses || true
+
+      - name: Install Android SDK packages
+        run: sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Build debug APK
         run: |
-          yes | sdkmanager --licenses || true
-          sdkmanager "platforms;android-36" "build-tools;36.0.0"
-
-      - name: Build APK
-        run: gradle --no-daemon assembleDebug
+          chmod +x gradlew || true
+          if [ -f gradlew ]; then
+            ./gradlew --no-daemon assembleDebug
+          else
+            echo "ERROR: gradlew file missing from repository"
+            exit 1
+          fi
 
       - name: Upload APK
+        if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: 5g-dns-quick-switch-arm64-debug
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: 5G-DNS-Quick-Switch-APK
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
