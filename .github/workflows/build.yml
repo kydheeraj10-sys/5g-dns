@@ -16,10 +16,6 @@ jobs:
     name: Build Android APK
     runs-on: ubuntu-latest
 
-    env:
-      ANDROID_HOME: /usr/local/lib/android/sdk
-      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -30,45 +26,51 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Android SDK tools
+      - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
       - name: Accept Android SDK licenses
         shell: bash
         run: |
           set -e
-          mkdir -p "$ANDROID_HOME/licenses"
-          yes | sdkmanager --licenses
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
 
-      - name: Install required Android SDK packages
+          if [ ! -x "$SDKMANAGER" ]; then
+            SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | head -n 1)"
+          fi
+
+          if [ -z "$SDKMANAGER" ] || [ ! -x "$SDKMANAGER" ]; then
+            echo "ERROR: sdkmanager not found"
+            exit 1
+          fi
+
+          echo "Using SDK Manager: $SDKMANAGER"
+          set -o pipefail
+          yes | "$SDKMANAGER" --licenses
+
+      - name: Install Android SDK packages
         shell: bash
         run: |
-          sdkmanager \
-            "platform-tools" \
-            "platforms;android-36" \
-            "build-tools;36.0.0"
+          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | head -n 1)"
+          "$SDKMANAGER" "platform-tools" "platforms;android-36" "build-tools;36.0.0"
 
       - name: Check project files
         shell: bash
         run: |
-          if [ ! -f "gradlew" ]; then
-            echo "ERROR: gradlew is missing from the repository."
+          test -f gradlew || {
+            echo "ERROR: gradlew is missing"
             exit 1
-          fi
-
-          if [ ! -f "app/build.gradle" ]; then
-            echo "ERROR: app/build.gradle is missing."
+          }
+          test -f app/build.gradle || {
+            echo "ERROR: app/build.gradle is missing"
             exit 1
-          fi
-
+          }
           chmod +x gradlew
 
       - name: Build debug APK
-        shell: bash
-        run: |
-          ./gradlew --no-daemon assembleDebug
+        run: ./gradlew --no-daemon assembleDebug
 
-      - name: Upload APK artifact
+      - name: Upload APK
         if: success()
         uses: actions/upload-artifact@v4
         with:
