@@ -1,0 +1,36 @@
+
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract project ZIP
+        run: |
+          unzip -o 5g-dns-quick-switch-source.zip -d .
+          ls -la
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Build APK
+        run: gradle --no-daemon assembleDebug
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: 5g-dns-quick-switch-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
