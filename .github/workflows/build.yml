@@ -27,42 +27,30 @@ jobs:
           java-version: '17'
 
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Accept Android SDK licenses
-        shell: bash
-        run: |
-          set -e
-          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
-
-          if [ ! -x "$SDKMANAGER" ]; then
-            SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | head -n 1)"
-          fi
-
-          if [ -z "$SDKMANAGER" ] || [ ! -x "$SDKMANAGER" ]; then
-            echo "ERROR: sdkmanager not found"
-            exit 1
-          fi
-
-          echo "Using SDK Manager: $SDKMANAGER"
-          set -o pipefail
-          yes | "$SDKMANAGER" --licenses
+        uses: android-actions/setup-android@v4
+        with:
+          accept-android-sdk-licenses: true
+          log-accepted-android-sdk-licenses: false
+          packages: ''
 
       - name: Install Android SDK packages
-        shell: bash
         run: |
-          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | head -n 1)"
-          "$SDKMANAGER" "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+          sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
 
       - name: Check project files
         shell: bash
         run: |
-          test -f gradlew || {
-            echo "ERROR: gradlew is missing"
+          set -e
+          test -f settings.gradle || {
+            echo "ERROR: settings.gradle is missing"
             exit 1
           }
           test -f app/build.gradle || {
             echo "ERROR: app/build.gradle is missing"
+            exit 1
+          }
+          test -f gradlew || {
+            echo "ERROR: gradlew is missing"
             exit 1
           }
           chmod +x gradlew
@@ -70,8 +58,15 @@ jobs:
       - name: Build debug APK
         run: ./gradlew --no-daemon assembleDebug
 
+      - name: Verify APK
+        shell: bash
+        run: |
+          set -e
+          APK="app/build/outputs/apk/debug/app-debug.apk"
+          test -f "$APK"
+          ls -lh "$APK"
+
       - name: Upload APK
-        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: 5G-DNS-Quick-Switch-APK
